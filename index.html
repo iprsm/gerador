@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Carteira de Membros - Igreja</title>
+    <title>IPRSM - Gerador</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
-        body {
+     body {
             font-family: 'Arial', sans-serif;
             background-color: #121212;
             color: #E0E0E0;
@@ -64,103 +64,59 @@
     </style>
 </head>
 <body>
-
-     <div class="header">
+    <div class="header">
         <img src="https://i.imgur.com/naHMr26.png" alt="Logo IPRSM" class="logo">
-        <h2>IPRSM - Carteira de Membros</h2>
+        <h2>IPRSM - Carteira de Identificação de Membros</h2>
     </div>
-
-    <label>
-        <select id="membersList" onchange="generateCard()">
-            <option value="">Carregando membros...</option>
-        </select>
-    </label>
-
+    <select id="membersList" onchange="generateCard()">
+        <option value="">Selecione o Membro</option>
+    </select>
     <div id="idCard" class="card">
         <h3 id="cardName"></h3>
         <p><strong>CPF:</strong> <span id="cardCPF"></span></p>
         <p><strong>Cargo:</strong> <span id="cardRole"></span></p>
-        <p><strong>Data de Batismo:</strong> <span id="cardBaptism"></span></p>
-        <p><strong>Nome do Pai:</strong> <span id="cardFather"></span></p>
-        <p><strong>Nome da Mãe:</strong> <span id="cardMother"></span></p>
+        <p><strong>Batismo:</strong> <span id="cardBaptism"></span></p>
+        <p><strong>Pai:</strong> <span id="cardFather"></span></p>
+        <p><strong>Mãe:</strong> <span id="cardMother"></span></p>
         <p><strong>Registro:</strong> <span id="cardReg"></span></p>
-        <p><strong>Emitido em:</strong> <span id="cardEmission"></span></p>
+        <p><strong>Emitido:</strong> <span id="cardEmission"></span></p>
         <p><strong>Válido até:</strong> <span id="cardExpiry"></span></p>
-        <img id="cardPhoto" src="" alt="Foto do membro">
+        <img id="cardPhoto" src="" alt="Foto">
     </div>
-
     <button onclick="downloadPDF()">Baixar PDF</button>
 
-
     <script>
-            const apiKey = '580b929cd3fd23399eb5a3cbeac8e3df';
-            const token = 'ATTA1a5ed79744840ebea79fcedb6c88ead3bddca932a9d5ab5191dbb8722dfd9083E14CC719';
-            const listId = '67891789508c1cc4f9ab7d59';
+        const apiKey = '580b929cd3fd23399eb5a3cbeac8e3df';
+        const token = 'ATTA1a5ed79744840ebea79fcedb6c88ead3bddca932a9d5ab5191dbb8722dfd9083E14CC719';
+        const boardId = '67891789508c1cc4f9ab7d59';
 
-          async function fetchMembers() {
-            const url = `https://api.trello.com/1/boards/${boardId}/cards?attachments=true&key=${apiKey}&token=${token}`;
-            const response = await fetch(url);
-            const cards = await response.json();
+        async function fetchMembers() {
+            try {
+                const url = `https://api.trello.com/1/boards/${boardId}/cards?attachments=true&key=${apiKey}&token=${token}`;
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Erro ao buscar dados no Trello');
+                const cards = await response.json();
+                const membersList = document.getElementById("membersList");
+                membersList.innerHTML = '<option value="">Selecione um membro</option>';
 
-            const membersList = document.getElementById("membersList");
-            membersList.innerHTML = '<option value="">Selecione um membro</option>';
-
-            let maxReg = 100000;
-
-            cards.forEach(card => {
-                let descParts = card.desc.split("|");
-                let regNumber = descParts[1] ? parseInt(descParts[1]) : null;
-                let emissionDate = descParts[2] || null;
-                let expiryDate = descParts[3] || null;
-                let cpf = descParts[4] || "Não informado";
-                let baptismDate = descParts[5] || "Não informado";
-                let fatherName = descParts[6] || "Não informado";
-                let motherName = descParts[7] || "Não informado";
-
-                if (!regNumber) {
-                    regNumber = ++maxReg;
-                    const now = new Date();
-                    emissionDate = now.toISOString().split("T")[0];
-                    expiryDate = new Date(now.setFullYear(now.getFullYear() + 15)).toISOString().split("T")[0];
-
-                    updateCardDescription(card.id, `${descParts[0]}|${regNumber}|${emissionDate}|${expiryDate}|${cpf}|${baptismDate}|${fatherName}|${motherName}`);
-                } else {
-                    maxReg = Math.max(maxReg, regNumber);
-                }
-
-                const option = document.createElement("option");
-                option.value = JSON.stringify({ 
-                    id: card.id,
-                    name: card.name, 
-                    desc: descParts[0], 
-                    reg: regNumber,
-                    emission: emissionDate,
-                    expiry: expiryDate,
-                    cpf: cpf,
-                    baptism: baptismDate,
-                    father: fatherName,
-                    mother: motherName,
-                    image: card.attachments.length > 0 ? card.attachments[0].url : ""
+                cards.forEach(card => {
+                    let [name, reg, emission, expiry, cpf, baptism, father, mother] = card.desc.split("|");
+                    membersList.innerHTML += `<option value='${JSON.stringify({
+                        name, reg, emission, expiry, cpf, baptism, father, mother,
+                        image: card.attachments[0]?.url || ''
+                    })}'>${name} - Registro: ${reg}</option>`;
                 });
-                option.textContent = `${card.name} - Registro: ${regNumber}`;
-                membersList.appendChild(option);
-            });
-        }
-
-        async function updateCardDescription(cardId, newDesc) {
-            const url = `https://api.trello.com/1/cards/${cardId}?desc=${encodeURIComponent(newDesc)}&key=${apiKey}&token=${token}`;
-            await fetch(url, { method: "PUT" });
+            } catch (error) {
+                console.error('Erro ao carregar membros:', error);
+            }
         }
 
         function generateCard() {
-            const selectedData = document.getElementById("membersList").value;
-            if (!selectedData) return;
-
-            const member = JSON.parse(selectedData);
-
+            const member = JSON.parse(document.getElementById("membersList").value);
+            if (!member) return;
             document.getElementById("cardName").innerText = member.name;
             document.getElementById("cardCPF").innerText = member.cpf;
-            document.getElementById("cardRole").innerText = member.desc;
+            document.getElementById("cardRole").innerText = "Membro";
             document.getElementById("cardBaptism").innerText = member.baptism;
             document.getElementById("cardFather").innerText = member.father;
             document.getElementById("cardMother").innerText = member.mother;
@@ -169,6 +125,21 @@
             document.getElementById("cardExpiry").innerText = member.expiry;
             document.getElementById("cardPhoto").src = member.image || "https://via.placeholder.com/100";
             document.getElementById("idCard").style.display = "block";
+        }
+
+        function downloadPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            doc.text("Carteira de Membro", 20, 20);
+            doc.text("Nome: " + document.getElementById("cardName").innerText, 20, 40);
+            doc.text("CPF: " + document.getElementById("cardCPF").innerText, 20, 50);
+            doc.text("Batismo: " + document.getElementById("cardBaptism").innerText, 20, 60);
+            doc.text("Pai: " + document.getElementById("cardFather").innerText, 20, 70);
+            doc.text("Mãe: " + document.getElementById("cardMother").innerText, 20, 80);
+            doc.text("Registro: " + document.getElementById("cardReg").innerText, 20, 90);
+            doc.text("Emitido: " + document.getElementById("cardEmission").innerText, 20, 100);
+            doc.text("Válido até: " + document.getElementById("cardExpiry").innerText, 20, 110);
+            doc.save("carteira_de_membro.pdf");
         }
 
         window.onload = fetchMembers;
