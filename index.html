@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carteira de Membros - Igreja</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #121212;
+            color: #E0E0E0;
+            text-align: center;
+            padding: 20px;
+        }
+
+        h2 {
+            color: #FFFFFF;
+        }
+
+        select {
+            background-color: #1E1E1E;
+            color: #E0E0E0;
+            border: 1px solid #FFFFFF;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background-color: #1E1E1E;
+            border: 1px solid #FFFFFF;
+            padding: 20px;
+            width: 300px;
+            margin: 20px auto;
+            border-radius: 10px;
+            box-shadow: 0px 4px 10px rgba(187, 134, 252, 0.5);
+            display: none;
+        }
+
+        img {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            border: 2px solid #FFFFFF;
+            margin: 10px 0;
+        }
+
+        button {
+            background-color: #FFFFFF;
+            color: #121212;
+            border: none;
+            padding: 10px 15px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            background-color: #9A67EA;
+        }
+    </style>
+</head>
+<body>
+
+     <div class="header">
+        <img src="https://i.imgur.com/naHMr26.png" alt="Logo IPRSM" class="logo">
+        <h2>IPRSM - Carteira de Membros</h2>
+    </div>
+
+    <label>
+        <select id="membersList" onchange="generateCard()">
+            <option value="">Carregando membros...</option>
+        </select>
+    </label>
+
+    <div id="idCard" class="card">
+        <h3 id="cardName"></h3>
+        <p><strong>CPF:</strong> <span id="cardCPF"></span></p>
+        <p><strong>Cargo:</strong> <span id="cardRole"></span></p>
+        <p><strong>Data de Batismo:</strong> <span id="cardBaptism"></span></p>
+        <p><strong>Nome do Pai:</strong> <span id="cardFather"></span></p>
+        <p><strong>Nome da Mãe:</strong> <span id="cardMother"></span></p>
+        <p><strong>Registro:</strong> <span id="cardReg"></span></p>
+        <p><strong>Emitido em:</strong> <span id="cardEmission"></span></p>
+        <p><strong>Válido até:</strong> <span id="cardExpiry"></span></p>
+        <img id="cardPhoto" src="" alt="Foto do membro">
+    </div>
+
+    <button onclick="downloadPDF()">Baixar PDF</button>
+
+
+    <script>
+            const apiKey = '580b929cd3fd23399eb5a3cbeac8e3df';
+            const token = 'ATTA1a5ed79744840ebea79fcedb6c88ead3bddca932a9d5ab5191dbb8722dfd9083E14CC719';
+            const listId = '67891789508c1cc4f9ab7d59';
+
+          async function fetchMembers() {
+            const url = `https://api.trello.com/1/boards/${boardId}/cards?attachments=true&key=${apiKey}&token=${token}`;
+            const response = await fetch(url);
+            const cards = await response.json();
+
+            const membersList = document.getElementById("membersList");
+            membersList.innerHTML = '<option value="">Selecione um membro</option>';
+
+            let maxReg = 100000;
+
+            cards.forEach(card => {
+                let descParts = card.desc.split("|");
+                let regNumber = descParts[1] ? parseInt(descParts[1]) : null;
+                let emissionDate = descParts[2] || null;
+                let expiryDate = descParts[3] || null;
+                let cpf = descParts[4] || "Não informado";
+                let baptismDate = descParts[5] || "Não informado";
+                let fatherName = descParts[6] || "Não informado";
+                let motherName = descParts[7] || "Não informado";
+
+                if (!regNumber) {
+                    regNumber = ++maxReg;
+                    const now = new Date();
+                    emissionDate = now.toISOString().split("T")[0];
+                    expiryDate = new Date(now.setFullYear(now.getFullYear() + 15)).toISOString().split("T")[0];
+
+                    updateCardDescription(card.id, `${descParts[0]}|${regNumber}|${emissionDate}|${expiryDate}|${cpf}|${baptismDate}|${fatherName}|${motherName}`);
+                } else {
+                    maxReg = Math.max(maxReg, regNumber);
+                }
+
+                const option = document.createElement("option");
+                option.value = JSON.stringify({ 
+                    id: card.id,
+                    name: card.name, 
+                    desc: descParts[0], 
+                    reg: regNumber,
+                    emission: emissionDate,
+                    expiry: expiryDate,
+                    cpf: cpf,
+                    baptism: baptismDate,
+                    father: fatherName,
+                    mother: motherName,
+                    image: card.attachments.length > 0 ? card.attachments[0].url : ""
+                });
+                option.textContent = `${card.name} - Registro: ${regNumber}`;
+                membersList.appendChild(option);
+            });
+        }
+
+        async function updateCardDescription(cardId, newDesc) {
+            const url = `https://api.trello.com/1/cards/${cardId}?desc=${encodeURIComponent(newDesc)}&key=${apiKey}&token=${token}`;
+            await fetch(url, { method: "PUT" });
+        }
+
+        function generateCard() {
+            const selectedData = document.getElementById("membersList").value;
+            if (!selectedData) return;
+
+            const member = JSON.parse(selectedData);
+
+            document.getElementById("cardName").innerText = member.name;
+            document.getElementById("cardCPF").innerText = member.cpf;
+            document.getElementById("cardRole").innerText = member.desc;
+            document.getElementById("cardBaptism").innerText = member.baptism;
+            document.getElementById("cardFather").innerText = member.father;
+            document.getElementById("cardMother").innerText = member.mother;
+            document.getElementById("cardReg").innerText = member.reg;
+            document.getElementById("cardEmission").innerText = member.emission;
+            document.getElementById("cardExpiry").innerText = member.expiry;
+            document.getElementById("cardPhoto").src = member.image || "https://via.placeholder.com/100";
+            document.getElementById("idCard").style.display = "block";
+        }
+
+        window.onload = fetchMembers;
+    </script>
+</body>
+</html>
